@@ -8,13 +8,13 @@ object AppContact {
     fun mainMenu() {
         val possibleActions = MenuOptions.values().map { it.string }
         do {
-            val userChoice = getUserResponse("Enter action (${possibleActions.joinToString()}):")
+            val userChoice = getUserResponse("\nEnter action (${possibleActions.joinToString()}):")
             when (userChoice) {
                 MenuOptions.ADD.string -> addAction()
                 MenuOptions.REMOVE.string -> editOrRemoveAction(MenuOptions.REMOVE)
                 MenuOptions.EDIT.string -> editOrRemoveAction(MenuOptions.EDIT)
                 MenuOptions.COUNT.string -> countAction()
-                MenuOptions.LIST.string -> listAction()
+                MenuOptions.LIST.string -> infoAction()
                 MenuOptions.EXIT.string -> return
                 else -> println("Invalid Action!")
             }
@@ -23,8 +23,13 @@ object AppContact {
 
     private fun addAction() {
         listContacts = listContacts.toMutableList().let {
-            if(it.add(Contact.fromUserInput()))
+            val newContact = Contact.new()
+            if(newContact != null) {
+                it.add(newContact)
                 println("The record added.")
+            } else {
+                println("Invalid input")
+            }
             it.toList()
         }
     }
@@ -62,6 +67,18 @@ object AppContact {
         println("The Phone Book has ${listContacts.size} records.")
     }
 
+    private fun infoAction() {
+        listAction()
+        try {
+            val selectedIndex = getUserResponse("Enter index to show info: ").toInt()
+            if (selectedIndex in (1..listContacts.size)) {
+                listContacts[selectedIndex - 1].printInfo()
+            }
+        } catch (e: NumberFormatException) {
+            println("Is Not a number!")
+        }
+    }
+
     private fun listAction() {
         listContacts.forEachIndexed { index, contact ->
             println("${index + 1}. $contact")
@@ -74,6 +91,6 @@ enum class MenuOptions(val string: String) {
     REMOVE("remove"),
     EDIT("edit"),
     COUNT("count"),
-    LIST("list"),
+    LIST("info"),
     EXIT("exit")
 }

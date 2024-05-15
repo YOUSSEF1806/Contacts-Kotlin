@@ -1,16 +1,13 @@
 package com.youyou
 
-data class Contact(
-    private var name: String,
-    private var surname: String,
-    private var phone: String = ""
+import kotlinx.datetime.*
+
+open class Contact(
+    private var name: String
 ) {
-    fun setPhone(phone: String) {
-        if (checkValidPhone(phone))
-            this.phone = phone
-        else
-            this.phone = ""
-    }
+    private var phone: String = ""
+    private val timeCreated: Instant = Clock.System.now()
+    private var lastEditTime: Instant = Clock.System.now()
 
     private fun checkValidPhone(phone: String): Boolean {
         val regexPhoneFormat1 = Regex("""^\+?([0-9a-zA-Z]+)?\s?-?([0-9a-zA-Z]{2,}\s?-?)*$""")
@@ -23,29 +20,52 @@ data class Contact(
             .and(!phone.matches(parenthesesCheck))
     }
 
-    private fun hasNumber(): Boolean = this.phone != ""
-
-    fun editContact() {
-        val userResponse = getUserResponse("Select a field (name, surname, number): ")
-        when (userResponse) {
-            "name" -> name = getUserResponse("enter name: ")
-            "surname" -> surname = getUserResponse("enter surname: ")
-            "number" -> setPhone(getUserResponse("enter number: "))
+    open fun editContact(): Boolean {
+        when (this) {
+            is Organization -> return this.editContact()
+            is Person -> return this.editContact()
         }
-        println("The record updated!")
+        return false
     }
 
-    override fun toString(): String {
-        val phonePrint = if (hasNumber()) phone else "[no number]"
-        return "$name $surname, $phonePrint"
+    open fun printInfo() {
+        when (this) {
+            is Organization -> this.printInfo()
+            is Person -> this.printInfo()
+        }
     }
+
+    fun updated() {
+        lastEditTime = Clock.System.now()
+    }
+
+    fun hasNumber(): Boolean = this.phone != ""
+
+    fun setPhone(phone: String) {
+        this.phone = if (checkValidPhone(phone))
+            phone
+        else
+            ""
+    }
+
+    fun getPhone(): String = phone
+
+    fun setName(name: String) {
+        this.name = name
+    }
+
+    fun getName(): String = name
+
+    fun getTimeCreated(): Instant = timeCreated
+    fun getLastEditTime(): Instant = lastEditTime
 
     companion object {
-        fun fromUserInput() : Contact {
-            val name = getUserResponse("Enter the name of the person: ")
-            val surname = getUserResponse("Enter the surname of the person: ")
-            return Contact(name, surname).also {
-                it.setPhone(getUserResponse("Enter the number: "))
+        fun new(): Contact? {
+            val typeEntry = getUserResponse("Enter the type (person, organization): ")
+            return when (typeEntry) {
+                "person" -> Person.new()
+                "organization" -> Organization.new()
+                else -> null
             }
         }
     }
