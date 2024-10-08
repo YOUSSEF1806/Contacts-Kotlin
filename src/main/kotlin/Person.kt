@@ -1,98 +1,97 @@
-package com.youyou
+import com.squareup.moshi.Moshi
+import kotlinx.datetime.Clock
 
-import kotlinx.datetime.LocalDate
+data class Person(
+    private var name: String,
+    private var surname: String = "",
+    private var birthday: String = "",
+    private var gender: String = ""
+) : Contact() {
 
-class Person(
-    name: String,
-    private var surname: String
-) : Contact(name) {
-    private var birthday: LocalDate? = null
-    private var gender: Gender? = null
-
-    override fun editContact(): Boolean {
-        val userResponse = getUserResponse("Select a field (name, surname, birth, gender, number): ")
-        var wasUpdated = true
-        when (userResponse) {
-            "name" -> setName(getUserResponse("enter name: "))
-            "surname" -> surname = getUserResponse("enter surname: ")
-            "birth" ->  {
-                val valid = setBirthday(getUserResponse("Enter the birth date: "))
-                if(!valid) println("Bad birth date!")
-            }
-            "gender" -> {
-                val valid = setGender(getUserResponse("Enter the gender (M, F): "))
-                if (!valid) println("Bad gender!")
-            }
-            "number" -> setPhone(getUserResponse("enter number: "))
-            else -> wasUpdated = false
-        }
-        if (wasUpdated) {
-            updated()
-            println("The record updated!")
-        }
-        return wasUpdated
+    override fun detailString(): String {
+        val birthdayString = birthday.ifBlank { "[no data]" }
+        val genderString = gender.ifEmpty { "[no data]" }
+        val phoneString = if (hasNumber()) phone else "[no number]"
+        val infoString = "Name: $name \nSurname: $surname " +
+                "\nBirth date: $birthdayString \nGender: $genderString" +
+                "\nNumber: $phoneString " +
+                "\nTime created: $timeCreated." +
+                "\nTime last edit: $lastEditTime"
+        return infoString
     }
 
-    fun setBirthday(birthday: String): Boolean {
-        try {
-            this.birthday = LocalDate.parse(birthday)
-            return true
-        } catch (e: Exception) {
-            this.birthday = null
-            return false
+    override fun listProperties(): List<String> =
+        listOf("name", "surname", "birth", "gender", "number")
+
+    override fun setProperty(propertyName: String, value: String) {
+        return when (propertyName) {
+            "name" -> this.name = value
+            "surname" -> this.surname = value
+            "birth" -> this.birthday = validateBirthday(value)
+            "gender" -> this.gender = validateGender(value)
+            "number" -> this.phone = value
+            else -> {}
         }
     }
 
-    fun setGender(gender: String): Boolean {
-        when (gender) {
-            "F" -> {
-                this.gender = Gender.FEMALE
-                return true
-            }
-            "M" -> {
-                this.gender = Gender.MALE
-                return true
-            }
-            else -> {
-                this.gender = null
-                return false
-            }
+    override fun getProperty(propertyName: String): String {
+        return when (propertyName) {
+            "name" -> name
+            "surname" -> surname
+            "birth" -> birthday
+            "gender" -> gender
+            "number" -> phone
+            else -> ""
         }
     }
 
-    override fun printInfo() {
-        val birthdayString = birthday ?: "[no data]"
-        val genderString = gender?.string ?: "[no data]"
-        println("Name: ${getName()}")
-        println("Surname: $surname")
-        println("Birth date: $birthdayString")
-        println("Gender: $genderString")
-        val phoneString = if (hasNumber()) getPhone() else "[no number]"
-        println("Number: $phoneString")
-        println("Time created: ${getTimeCreated().asTZDefaultDateTime()}")
-        println("Time last edit: ${getLastEditTime().asTZDefaultDateTime()}")
-    }
+    override fun toString(): String = "$name $surname"
 
-    override fun toString(): String = "${getName()} $surname"
+    override fun toJsonFormat(moshi: Moshi): String {
+        val adapter = moshi.adapter(Person::class.java)
+        return adapter.toJson(this)
+    }
 
     companion object {
         fun new(): Person {
             val name = getUserResponse("Enter the name of the person: ")
             val surname = getUserResponse("Enter the surname of the person: ")
-            val p = Person(name, surname)
-            val birthday = getUserResponse("Enter the birth date: ")
-            if (p.setBirthday(birthday))
-                println("Bad birth date!")
-            val gender = getUserResponse("Enter the gender (M, F): ")
-            if (p.setGender(gender))
-                println("Bad gender!")
-            p.setPhone(getUserResponse("Enter the number: "))
+            val birthday = validateBirthday(getUserResponse("Enter the birth date: "))
+            val gender = validateGender(getUserResponse("Enter the gender (F, M): "))
+            val phoneNumber = getUserResponse("Enter the number: ")
+            val p = Person(name, surname, birthday, gender)
+                .also{
+                    it.phone = phoneNumber
+                    it.timeCreated = Clock.System.now().toString()
+                    it.lastEditTime = Clock.System.now().toString()
+                }
             return p
         }
-    }
-}
 
-enum class Gender(val string: String) {
-    FEMALE("F"),
-    MALE("M")
+        fun fromJsonFormat(moshi: Moshi, jsonString: String): Person? {
+            val adapter = moshi.adapter(Person::class.java)
+            return adapter.fromJson(jsonString)
+        }
+
+        private fun validateBirthday(birthday: String): String {
+            val dateRegex = Regex("""\d{4}(-|/)\d{2}\1\d{2}""")
+            if (birthday.matches(dateRegex)) {
+                if(birthday.contains("/"))
+                    return birthday.replace("/", "-")
+                return birthday
+            } else {
+                println("Bad birth date!")
+                return ""
+            }
+        }
+
+        private fun validateGender(gender: String): String {
+            if (gender.uppercase() == "F" || gender.uppercase() == "M") {
+                return gender.uppercase()
+            } else {
+                println("Bad gender!")
+                return ""
+            }
+        }
+    }
 }

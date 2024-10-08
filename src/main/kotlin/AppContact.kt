@@ -1,96 +1,55 @@
-package com.youyou
+import PhoneBook.listContacts
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readLines
+import kotlin.io.path.writeLines
 
-internal fun getUserResponse(prompt: String) = print(prompt).let { readln().trim() }
 
 object AppContact {
-    private var listContacts = listOf<Contact>()
+    private var fileName = "" // data/phonebook.txt
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
 
-    fun mainMenu() {
-        val possibleActions = MenuOptions.values().map { it.string }
-        do {
-            val userChoice = getUserResponse("\nEnter action (${possibleActions.joinToString()}):")
-            when (userChoice) {
-                MenuOptions.ADD.string -> addAction()
-                MenuOptions.REMOVE.string -> editOrRemoveAction(MenuOptions.REMOVE)
-                MenuOptions.EDIT.string -> editOrRemoveAction(MenuOptions.EDIT)
-                MenuOptions.COUNT.string -> countAction()
-                MenuOptions.LIST.string -> infoAction()
-                MenuOptions.EXIT.string -> return
-                else -> println("Invalid Action!")
-            }
-        } while (userChoice != MenuOptions.EXIT.string)
+    fun launch() {
+        loadFromFile()
+        Menu.menuLoop()
+        saveToFile()
     }
 
-    private fun addAction() {
-        listContacts = listContacts.toMutableList().let {
-            val newContact = Contact.new()
-            if(newContact != null) {
-                it.add(newContact)
-                println("The record added.")
-            } else {
-                println("Invalid input")
-            }
-            it.toList()
+    private fun saveToFile() {
+        if (fileName != "" && listContacts.isNotEmpty()) {
+            Path(fileName)
+                .writeLines(
+                    listContacts.map {
+                        val prefix = if (it is Organization) "organization" else "person"
+                        "$prefix: ${it.toJsonFormat(moshi)}"
+                    }
+                )
         }
     }
 
-    private fun editOrRemoveAction(action: MenuOptions) {
-        if (listContacts.isNotEmpty()) {
-            listAction()
-            try {
-                val selectedIndex = getUserResponse("Select a record: ").toInt()
-                if (selectedIndex in (1..listContacts.size)) {
-                    if (action == MenuOptions.EDIT)
-                        editAction(selectedIndex - 1)
-                    else if (action == MenuOptions.REMOVE)
-                        removeAction(selectedIndex - 1)
-                }
-            } catch (e: NumberFormatException) {
-                println("Is Not a number!")
+    private fun loadFromFile() {
+        val pathFile = Path(fileName)
+        if (fileName != "" && pathFile.exists()) {
+            println("open $fileName")
+            listContacts = pathFile.readLines().map { line ->
+                val type = line.substringBefore(": {")
+                if (type == "person")
+                    Person.fromJsonFormat(moshi, line.substringAfter("$type: ")) !!
+                else
+                    Organization.fromJsonFormat(moshi, line.substringAfter("$type: ")) !!
             }
-        } else println("No records to ${action.string}!")
-    }
-
-    private fun editAction(index: Int) {
-        listContacts[index].editContact()
-    }
-
-    private fun removeAction(index: Int) {
-        listContacts = listContacts.toMutableList().let {
-            it.removeAt(index)
-            println("The record removed!")
-            it.toList()
         }
     }
 
-    private fun countAction() {
-        println("The Phone Book has ${listContacts.size} records.")
-    }
-
-    private fun infoAction() {
-        listAction()
-        try {
-            val selectedIndex = getUserResponse("Enter index to show info: ").toInt()
-            if (selectedIndex in (1..listContacts.size)) {
-                listContacts[selectedIndex - 1].printInfo()
-            }
-        } catch (e: NumberFormatException) {
-            println("Is Not a number!")
+    fun setFileName(fileName: String) {
+        if (fileName.trim() == "") {
+            this.fileName = ""
+        } else {
+            this.fileName = fileName
         }
     }
-
-    private fun listAction() {
-        listContacts.forEachIndexed { index, contact ->
-            println("${index + 1}. $contact")
-        }
-    }
-}
-
-enum class MenuOptions(val string: String) {
-    ADD("add"),
-    REMOVE("remove"),
-    EDIT("edit"),
-    COUNT("count"),
-    LIST("info"),
-    EXIT("exit")
 }
